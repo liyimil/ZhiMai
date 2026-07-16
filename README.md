@@ -1,232 +1,242 @@
 # 智脉（ZhiMai）
 
-智脉是一个面向知识获取与分享场景的前后端分离社区应用。用户可以发布“知文”、浏览首页 Feed、搜索内容、点赞收藏、关注其他用户，并围绕单篇知文进行流式 AI 问答。
+> 面向知识创作、内容检索与 AI 辅助学习的全栈知识社区。
 
-项目不仅实现了基础社区功能，也包含缓存、异步消息、搜索、对象存储和 RAG 等服务端实践，适合作为全栈学习、系统设计和二次开发项目。
+`Java 21` · `Spring Boot 3.2` · `React 18` · `TypeScript` · `MySQL` · `Redis` · `Kafka` · `Elasticsearch` · `Spring AI`
 
-## 主要功能
+智脉围绕“发布一篇知识内容，并让它可以被发现、互动和继续追问”构建完整业务链路。项目不仅实现注册登录、内容发布、Feed、搜索、点赞收藏和关注关系，还针对缓存击穿、异步一致性、全文检索和 RAG 流式问答进行了工程化设计。
 
-- 用户认证：验证码、注册、登录、JWT 双令牌刷新、退出和密码重置
-- 知文管理：草稿创建、内容直传、发布、编辑、置顶、可见性设置和删除
-- 内容浏览：首页 Feed、知文详情、我的知文和图片预览
-- 社区互动：点赞、取消点赞、收藏、取消收藏、关注和取关
-- 用户中心：个人资料展示与编辑、头像上传、关注与粉丝列表
-- 内容搜索：关键词搜索、标签过滤和搜索建议
-- AI 能力：自动生成知文摘要、基于单篇知文的 RAG 流式问答
-- 高并发设计：多级缓存、热点探测、single-flight、异步计数和重建机制
+## 项目速览
+
+| 维度 | 说明 |
+| --- | --- |
+| 项目形态 | React + Spring Boot 前后端分离应用 |
+| 核心业务 | 用户认证、内容创作、首页 Feed、互动关系、全文搜索、个人主页 |
+| AI 能力 | 内容自动摘要、单篇知文 RAG、SSE 流式回答 |
+| 工程重点 | 多级缓存、热点 Key 探测、Single Flight、Kafka 异步计数、Transactional Outbox |
+| 数据基础设施 | MySQL、Redis、Kafka、Elasticsearch、Canal、阿里云 OSS |
+
+## 为什么做这个项目
+
+普通的内容社区 CRUD 无法覆盖真实后端系统中最常见的难点。智脉选择知识社区作为业务载体，重点实践以下问题：
+
+- 如何设计可刷新、可撤销的无状态身份认证；
+- 如何让高频 Feed 请求尽量不回源数据库，并避免缓存击穿和集中失效；
+- 如何在关注关系、互动计数和搜索索引之间处理异步一致性；
+- 如何把 Markdown 内容切片、向量化、检索并约束大模型基于原文回答；
+- 如何让前端完整承接注册、创作、搜索、互动和流式问答流程。
 
 ## 系统架构
 
 ```mermaid
 flowchart LR
-    U["Web 用户"] --> FE["React + Vite"]
+    USER["Web 用户"] --> FE["React + TypeScript"]
     FE --> API["Spring Boot REST API"]
-    API --> DB["MySQL"]
-    API --> REDIS["Redis / Redisson"]
-    API --> OSS["阿里云 OSS"]
-    API --> ES["Elasticsearch"]
-    API --> AI["小米 MiMo / Embedding 模型"]
-    DB --> CANAL["Canal"]
+
+    API --> MYSQL["MySQL<br/>业务数据 / Outbox"]
+    API --> REDIS["Redis + Redisson<br/>令牌 / 缓存 / 计数"]
+    API --> ES["Elasticsearch<br/>全文检索 / 向量检索"]
+    API --> OSS["阿里云 OSS<br/>正文 / 图片 / 头像"]
+    API --> LLM["MiMo + Embedding API"]
+
+    MYSQL --> CANAL["Canal"]
     CANAL --> KAFKA["Kafka"]
     API --> KAFKA
     KAFKA --> API
 ```
 
-后端采用模块化单体结构。核心模块通过 MySQL 保存业务数据，Redis 承担令牌、缓存和计数等高频访问，Kafka 与 Canal 用于异步事件处理，Elasticsearch 提供全文及向量检索，OSS 保存正文、图片和头像等对象。
+后端采用模块化单体结构。业务数据以 MySQL 为事实来源，Redis 承担高频读写，Kafka 处理计数和领域事件，Canal 捕获 Outbox 增量，Elasticsearch 同时服务全文搜索与向量检索。
+
+## 核心工程设计
+
+### 1. 可撤销的 JWT 双令牌认证
+
+- 使用 RSA 密钥对签发和校验 JWT，Access Token 与 Refresh Token 职责分离；
+- Access Token 默认 15 分钟过期，Refresh Token 默认 7 天过期；
+- Refresh Token 的 `jti` 保存在 Redis 白名单，刷新时轮换，退出登录时撤销；
+- 密码使用 BCrypt 加密，并对验证码发送频率、有效期和最大尝试次数进行限制。
+
+### 2. 面向 Feed 的多级缓存
+
+```mermaid
+flowchart LR
+    REQ["Feed 请求"] --> L1["Caffeine 本地缓存"]
+    L1 -->|未命中| PAGE["Redis 页面缓存"]
+    PAGE -->|未命中| FRAGMENT["Redis ids / item / count 片段缓存"]
+    FRAGMENT -->|未命中| DB["MySQL"]
+    DB --> FILL["回填缓存 + TTL 抖动"]
+```
+
+- 公共 Feed 使用 Caffeine、Redis 页面缓存和 Redis 片段缓存逐级降压；
+- 同一页面并发回源时使用 Single Flight 合并请求，降低缓存击穿风险；
+- 缓存 TTL 加入随机抖动，减少大批 Key 同时过期；
+- 滑动时间窗口统计 Key 热度，并按热度等级动态延长 TTL；
+- 用户维度的点赞、收藏状态不写入公共缓存，避免跨用户数据污染。
+
+### 3. 异步事件与最终一致性
+
+- 点赞、收藏等计数变更写入 Kafka，由消费者异步聚合；
+- 关注关系在业务事务内写入 Outbox，避免数据库提交成功但消息发送失败；
+- Canal 订阅 Outbox 表并转发 Kafka，消费者更新粉丝关系缓存和搜索索引；
+- Kafka Producer 开启幂等配置，Consumer 使用手动确认，降低消息丢失和重复处理风险。
+
+### 4. 单篇内容 RAG
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant A as Spring Boot
+    participant E as Embedding API
+    participant ES as Elasticsearch
+    participant M as MiMo
+
+    U->>A: 针对知文提问
+    A->>A: 校验并按需重建内容索引
+    A->>E: 生成问题向量
+    E-->>A: Embedding
+    A->>ES: KNN 检索并按 postId 过滤
+    ES-->>A: 相关内容切片
+    A->>M: 问题 + 受约束上下文
+    M-->>U: SSE 流式回答
+```
+
+- 发布或更新知文时建立内容向量索引，并通过内容指纹避免无效重建；
+- 检索时先扩大召回集合，再按 `postId` 过滤，避免不同文章的上下文互相污染；
+- 系统提示词要求模型只依据召回内容作答，无法确定时明确说明；
+- 前端使用 `EventSource` 实时展示生成内容，并支持主动终止。
+
+### 5. 搜索与对象存储
+
+- Elasticsearch 提供关键词搜索、标签过滤和搜索建议；
+- 搜索索引可由 Outbox 事件增量更新，降低业务写路径耦合；
+- 正文、封面和头像通过 OSS 预签名方式直传，后端不转发大文件。
+
+## 功能清单
+
+| 模块 | 已实现能力 |
+| --- | --- |
+| 认证 | 验证码、注册、登录、Token 刷新、退出登录、密码重置 |
+| 内容 | 草稿、正文直传、发布、编辑、可见性、置顶、删除、AI 摘要 |
+| Feed | 公共首页、我的发布、分页、详情展示、Markdown 渲染 |
+| 互动 | 点赞、收藏、关注、取关、粉丝与关注列表 |
+| 搜索 | 关键词检索、标签过滤、联想建议 |
+| 用户 | 个人主页、资料编辑、头像上传、关系计数 |
+| AI | 单篇知文索引重建、向量召回、RAG 流式问答 |
 
 ## 技术栈
 
-| 范围 | 技术 |
+| 层级 | 技术 |
 | --- | --- |
 | 前端 | React 18、TypeScript、Vite 5、React Router、React Markdown |
 | 后端 | Java 21、Spring Boot 3.2、Spring Security、Spring AI、MyBatis |
-| 数据与缓存 | MySQL 8、Redis、Redisson、Caffeine |
-| 消息与同步 | Kafka、Canal、Transactional Outbox |
-| 搜索与 AI | Elasticsearch、RAG、小米 MiMo、OpenAI 兼容 Embedding API |
-| 文件存储 | 阿里云 OSS 预签名直传 |
+| 数据 | MySQL 8、Redis、Redisson、Caffeine |
+| 消息 | Kafka、Canal、Transactional Outbox |
+| 搜索与 AI | Elasticsearch、KNN 向量检索、MiMo、DashScope Embedding |
+| 存储 | 阿里云 OSS 预签名直传 |
 | 测试 | JUnit 5、Mockito、Spring Boot Test、TypeScript 类型检查 |
+
+## 代码导览
+
+如果只想快速了解核心实现，建议按以下顺序阅读：
+
+| 主题 | 入口 |
+| --- | --- |
+| JWT 与认证流程 | [`backend/src/main/java/com/tongji/auth`](backend/src/main/java/com/tongji/auth) |
+| Feed 多级缓存 | [`KnowPostFeedServiceImpl.java`](backend/src/main/java/com/tongji/knowpost/service/impl/KnowPostFeedServiceImpl.java) |
+| 热点 Key 探测 | [`HotKeyDetector.java`](backend/src/main/java/com/tongji/cache/hotkey/HotKeyDetector.java) |
+| 关注关系与 Outbox | [`backend/src/main/java/com/tongji/relation`](backend/src/main/java/com/tongji/relation) |
+| 异步计数 | [`backend/src/main/java/com/tongji/counter`](backend/src/main/java/com/tongji/counter) |
+| 全文搜索 | [`backend/src/main/java/com/tongji/search`](backend/src/main/java/com/tongji/search) |
+| RAG 索引与问答 | [`backend/src/main/java/com/tongji/llm/rag`](backend/src/main/java/com/tongji/llm/rag) |
+| 前端页面 | [`frontend/src/pages`](frontend/src/pages) |
+| 数据库结构 | [`backend/db/schema.sql`](backend/db/schema.sql) |
 
 ## 项目结构
 
-仓库整理后采用以下目录结构：
-
 ```text
 ZhiMai/
-├── frontend/                  # React 前端
-│   ├── src/
-│   │   ├── components/       # 通用组件与页面布局
-│   │   ├── context/          # 登录状态管理
-│   │   ├── pages/            # 页面与路由
-│   │   ├── services/         # 后端 API 调用
-│   │   ├── theme/            # 主题变量
-│   │   └── types/            # TypeScript 类型
-│   └── package.json
-├── backend/                   # Spring Boot 后端
-│   ├── db/schema.sql          # MySQL 初始化脚本
-│   ├── docs/                  # 接口与设计文档
-│   ├── src/main/java/com/tongji/
-│   │   ├── auth/             # 认证与 JWT
-│   │   ├── knowpost/         # 知文与 Feed
-│   │   ├── counter/          # 点赞、收藏与计数
-│   │   ├── relation/         # 关注关系
-│   │   ├── search/           # Elasticsearch 搜索
-│   │   ├── llm/              # 摘要与 RAG
-│   │   ├── profile/          # 用户资料
-│   │   └── storage/          # OSS 上传
-│   └── pom.xml
+├── frontend/                       # React 前端
+│   ├── src/components/             # 通用组件与页面布局
+│   ├── src/context/                # 登录状态管理
+│   ├── src/pages/                  # 业务页面
+│   ├── src/services/               # API 调用层
+│   └── public/demo/                # 本地演示正文与封面
+├── backend/                        # Spring Boot 后端
+│   ├── db/schema.sql               # MySQL 初始化脚本
+│   ├── scripts/seed-demo.sql       # 演示数据
+│   ├── docs/                       # 接口与设计文档
+│   └── src/main/java/com/tongji/   # 后端业务模块
 └── README.md
 ```
 
 ## 本地运行
 
-### 1. 环境要求
+### 环境要求
 
-- JDK 21
-- Maven 3.9+
-- Node.js 18+ 与 npm
-- MySQL 8
-- Redis
-- Kafka
-- Elasticsearch
-- 可选：Canal、阿里云 OSS；RAG 功能需要小米 MiMo 与 Embedding 模型服务
+- JDK 21、Maven 3.9+
+- Node.js 18+、npm
+- MySQL 8、Redis、Kafka、Elasticsearch
+- 可选：Canal、阿里云 OSS、MiMo 与 DashScope API
 
-若只验证部分功能，可以关闭 Canal 和计数重建，但后端启动及完整业务流程仍依赖相应的数据服务和正确配置。
-
-### 2. 初始化数据库
-
-创建数据库后执行：
+### 1. 初始化数据库
 
 ```bash
 mysql -u root -p < backend/db/schema.sql
-```
-
-脚本会创建用户、登录日志、知文、Outbox、关注和粉丝等核心表。
-
-如需快速查看完整页面，可继续导入幂等的演示数据：
-
-```bash
 mysql -u root -p < backend/scripts/seed-demo.sql
 ```
 
-演示数据包含 8 个用户、12 篇公开知文和 16 组关注关系；本地封面与 Markdown 正文位于 `frontend/public/demo/`。导入后重启后端即可清空进程内 Feed 缓存并自动回灌 Elasticsearch。演示账号手机号为 `18800000101` 至 `18800000108`，开发环境登录验证码可从后端日志读取。
+演示脚本包含 8 个用户、12 篇公开知文和 16 组关注关系，对应的本地 Markdown 正文位于 `frontend/public/demo/`。
 
-### 3. 配置后端
+### 2. 配置后端
 
-`backend/src/main/resources/application.yml` 已使用环境变量占位，不包含真实凭据。至少设置：
+配置项均支持环境变量覆盖，仓库不包含真实凭据。最常用的变量如下：
 
-```bash
-export MIMO_API_KEY=your_mimo_key
-export DASHSCOPE_API_KEY=your_dashscope_key
-export DB_PASSWORD=your_mysql_password
+```dotenv
+DB_URL=jdbc:mysql://localhost:3306/zhiguang
+DB_USERNAME=root
+DB_PASSWORD=your_password
+REDIS_HOST=localhost
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+ELASTICSEARCH_URIS=http://localhost:9200
+
+MIMO_API_KEY=your_mimo_key
+DASHSCOPE_API_KEY=your_dashscope_key
 ```
 
-Windows PowerShell 使用 `$env:MIMO_API_KEY="..."` 的形式。其他主要配置如下：
+首次运行还需要在 `backend/src/main/resources/keys/` 生成 JWT RSA 密钥，命令见该目录的 [`README.md`](backend/src/main/resources/keys/README.md)。开发环境验证码会写入后端日志，不会真实发送短信或邮件。
 
-| 配置前缀 | 用途 |
-| --- | --- |
-| `spring.datasource` | MySQL 连接信息 |
-| `spring.data.redis` | Redis 地址与端口 |
-| `spring.kafka` | Kafka Broker 与消费者配置 |
-| `spring.elasticsearch` | Elasticsearch 地址 |
-| `spring.ai.deepseek` | 小米 MiMo OpenAI 兼容接口配置（沿用 Spring AI 配置前缀） |
-| `spring.ai.openai` | Embedding 模型配置 |
-| `spring.ai.vectorstore.elasticsearch` | 向量索引名称与维度 |
-| `canal` | MySQL Binlog 订阅；本地无需时可设置 `enabled: false` |
-| `oss` | OSS Endpoint、Bucket 与访问凭据 |
-| `auth.jwt` | JWT 签名密钥路径与令牌有效期 |
-
-向量模型的输出维度必须与 `spring.ai.vectorstore.elasticsearch.dimensions` 保持一致。
-
-首次运行还需在 `backend/src/main/resources/keys/` 生成 JWT 开发密钥，命令见该目录的 `README.md`。密钥文件和 `application-local.yml` 均已被 Git 忽略。
-
-开发环境中的验证码发送器只会把验证码写入后端日志，不会实际发送短信或邮件。
-
-### 4. 启动后端
+### 3. 启动服务
 
 ```bash
+# 后端，默认 http://localhost:8080
 cd backend
 mvn spring-boot:run
 ```
 
-后端默认运行在 `http://localhost:8080`，健康检查地址为：
-
-```text
-http://localhost:8080/actuator/health
-```
-
-### 5. 启动前端
-
 ```bash
+# 前端，默认 http://localhost:5173
 cd frontend
 npm ci
 npm run dev
 ```
 
-访问 `http://localhost:5173`。开发服务器会把 `/api` 请求代理到 `http://localhost:8080`。
+后端健康检查：`GET http://localhost:8080/actuator/health`
 
-生产环境可通过前端环境变量指定 API 地址：
-
-```dotenv
-VITE_API_BASE_URL=https://api.example.com
-```
-
-## 页面路由
-
-| 路径 | 页面 |
-| --- | --- |
-| `/` | 首页 Feed |
-| `/search` | 内容搜索 |
-| `/create` | 发布知文 |
-| `/learn` | 学习页 |
-| `/post/:id` | 知文详情与 AI 问答 |
-| `/profile` | 个人主页 |
-| `/profile/edit` | 编辑资料 |
-| `/login` | 登录 |
-| `/register` | 注册 |
-
-## API 概览
-
-后端接口统一使用 `/api/v1` 前缀：
-
-| 模块 | 前缀 | 说明 |
-| --- | --- | --- |
-| 认证 | `/api/v1/auth` | 验证码、注册、登录、令牌刷新、退出 |
-| 知文 | `/api/v1/knowposts` | 草稿、发布、Feed、详情、摘要和 RAG |
-| 文件 | `/api/v1/storage` | OSS 预签名上传 |
-| 互动 | `/api/v1/action` | 点赞、收藏及其撤销操作 |
-| 计数 | `/api/v1/counter` | 点赞数、收藏数等聚合计数 |
-| 关系 | `/api/v1/relation` | 关注、取关、粉丝和关注列表 |
-| 资料 | `/api/v1/profile` | 用户资料与头像 |
-| 搜索 | `/api/v1/search` | 内容搜索与关键词建议 |
-
-详细请求和响应格式见 `backend/docs/` 与 `frontend/docs/`。
-
-## 检查与测试
-
-前端：
+## 测试与构建
 
 ```bash
+# 前端类型检查与生产构建
 cd frontend
 npm run lint
 npm run build
-```
 
-后端：
-
-```bash
+# 后端测试
 cd backend
 mvn test
 ```
 
-现有后端测试主要覆盖 JWT 服务与热点 Key 探测逻辑。
+当前测试覆盖 JWT 签发与解析、热点 Key 探测等关键逻辑。仓库中的前端类型检查、生产构建和后端测试均可通过。
 
-## 安全提示
+## 项目边界
 
-- 不要把数据库密码、模型 API Key、OSS 密钥或 JWT 私钥提交到 Git。
-- 建议使用环境变量或本地配置文件注入敏感配置，并提供脱敏的示例配置。
-- 生产环境应限制 CORS 来源，关闭验证码日志输出，并接入真实验证码发送渠道。
-- 上线前应为 MySQL、Redis、Kafka、Elasticsearch 和 Canal 启用认证及网络访问控制。
-
-## 当前状态
-
-项目已具备前后端主要业务链路和配套设计文档，但仍属于开发阶段。生产部署前建议补充集成测试、容器化编排、配置分环境管理、可观测性和自动化 CI。
+该仓库用于完整展示系统设计和核心业务实现。验证码发送器当前采用开发日志输出；真实部署时还需要接入短信或邮件渠道，并补充容器编排、CI/CD、链路追踪和生产级监控告警。
