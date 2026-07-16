@@ -4,6 +4,10 @@
 
 `Java 21` · `Spring Boot 3.2` · `React 18` · `TypeScript` · `MySQL` · `Redis` · `Kafka` · `Elasticsearch` · `Spring AI`
 
+![智脉项目概览：知识创作、搜索、数据服务与 AI 问答](docs/images/zhimai-hero.png)
+
+<p align="center"><sub>知识内容、语义搜索、社区互动与 RAG 问答的一体化产品视图</sub></p>
+
 智脉围绕“发布一篇知识内容，并让它可以被发现、互动和继续追问”构建完整业务链路。项目不仅实现注册登录、内容发布、Feed、搜索、点赞收藏和关注关系，还针对缓存击穿、异步一致性、全文检索和 RAG 流式问答进行了工程化设计。
 
 ## 项目速览
