@@ -1,0 +1,86 @@
+.heroRow {
+  margin-bottom: 24px;
+}
+
+.masonry {
+  column-count: 3;
+  column-gap: 20px;
+}
+
+.masonryItem {
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  margin-bottom: 20px;
+  /* 保持卡片宽度由列宽决定，不额外增加内边距 */
+}
+
+.heroCard {
+  /* 作为顶部大卡展示，宽度占可用区域 */
+  width: 100%;
+}
+
+.emptyState {
+  column-span: all;
+  min-height: 310px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 52px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-soft);
+}
+
+.emptyEyebrow {
+  margin-bottom: 14px;
+  color: var(--color-primary-strong);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+}
+
+.emptyState h2 {
+  font-size: 27px;
+}
+
+.emptyState p {
+  margin-top: 10px;
+  color: var(--color-text-muted);
+}
+
+.emptyAction {
+  margin-top: 28px;
+  padding: 11px 17px;
+  border-radius: 9px;
+  background: var(--color-primary-strong);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.loadingState {
+  column-span: all;
+  padding: 48px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+@media (max-width: 1200px) {
+  .masonry {
+    column-count: 2;
+  }
+}
+
+@media (max-width: 1000px) {
+  .masonry { column-count: 2; }
+}
+
+@media (max-width: 700px) {
+  .masonry {
+    column-count: 1;
+  }
+
+  .emptyState { padding: 32px 24px; }
+}

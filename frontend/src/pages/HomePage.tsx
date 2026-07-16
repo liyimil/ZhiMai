@@ -1,0 +1,100 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import AppLayout from "@/components/layout/AppLayout";
+import MainHeader from "@/components/layout/MainHeader";
+import CourseCard from "@/components/cards/CourseCard";
+import LikeFavBar from "@/components/common/LikeFavBar";
+import { knowpostService } from "@/services/knowpostService";
+import AuthStatus from "@/features/auth/AuthStatus";
+import styles from "./HomePage.module.css";
+
+const HomePage = () => {
+  const [items, setItems] = useState<Array<{
+    id: string;
+    title: string;
+    description: string;
+    coverImage?: string;
+    tags: string[];
+    tagJson?: string;
+    authorAvatar?: string;
+    authorAvator?: string;
+    authorNickname: string;
+    likeCount?: number;
+    favoriteCount?: number;
+    liked?: boolean;
+    faved?: boolean;
+  }>>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await knowpostService.feed(1, 20);
+        if (!cancelled) {
+          setItems(resp.items ?? []);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "加载失败";
+        if (!cancelled) setError(msg);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <AppLayout
+      header={
+        <MainHeader
+          headline="让知识流动，让思考相遇"
+          subtitle="发现值得读的内容，也把你的经验分享给更多人"
+          rightSlot={<AuthStatus />}
+        />
+      }
+    >
+      {error ? <div>{error}</div> : null}
+      <div className={styles.masonry}>
+        {items.map(item => (
+          <div key={item.id} className={styles.masonryItem}>
+            <CourseCard
+              id={item.id}
+              title={item.title}
+              summary={item.description ?? ""}
+              tags={item.tags ?? []}
+              authorTags={(() => {
+                try {
+                  return item.tagJson ? (JSON.parse(item.tagJson) as unknown[]).filter((t) => typeof t === "string") as string[] : [];
+                } catch {
+                  return [];
+                }
+              })()}
+              teacher={{ name: item.authorNickname, avatarUrl: item.authorAvatar ?? item.authorAvator }}
+              coverImage={item.coverImage}
+                to={`/post/${item.id}`}
+              footerExtra={<LikeFavBar entityId={item.id} compact initialCounts={{ like: item.likeCount ?? 0, fav: item.favoriteCount ?? 0 }} initialState={{ liked: item.liked, faved: item.faved }} />}
+            />
+          </div>
+        ))}
+        {loading ? <div className={styles.loadingState}>正在整理内容…</div> : null}
+        {!loading && items.length === 0 ? (
+          <div className={styles.emptyState}>
+            <span className={styles.emptyEyebrow}>从第一条脉络开始</span>
+            <h2>这里还没有内容</h2>
+            <p>记录一个观点、一次实践，或一份值得被看见的经验。</p>
+            <Link to="/create" className={styles.emptyAction}>写下第一篇知文</Link>
+          </div>
+        ) : null}
+      </div>
+    </AppLayout>
+  );
+};
+
+export default HomePage;

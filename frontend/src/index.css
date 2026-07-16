@@ -1,0 +1,132 @@
+:root {
+  color-scheme: only light;
+  font-family: Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  --color-primary: #167f73;
+  --color-primary-strong: #0e655d;
+  --color-secondary: #dceeea;
+  --color-accent: #b9d8d1;
+  --color-success: #16825f;
+  --color-info: #366fa5;
+  --color-danger: #c94b4b;
+  --color-text-strong: #162522;
+  --color-text: #34423f;
+  --color-text-muted: #71807c;
+  --color-border: #dce5e2;
+  --color-bg: #f4f7f5;
+  --color-surface: #ffffff;
+  --color-surface-soft: #edf4f1;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --shadow-soft: 0 10px 28px rgba(20, 54, 48, 0.08);
+  --shadow-card: 0 12px 32px rgba(20, 54, 48, 0.07);
+  --sidebar-width: 224px;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+  background: var(--color-bg);
+}
+
+body {
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  background-image:
+    radial-gradient(circle at 88% 4%, rgba(22, 127, 115, 0.08), transparent 25%),
+    linear-gradient(rgba(22, 37, 34, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22, 37, 34, 0.018) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
+}
+
+#root {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: 650;
+  color: var(--color-text-strong);
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-shell {
+  width: min(1480px, 100%);
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  gap: 32px;
+  padding: 20px 32px 40px;
+}
+
+.ghost-button {
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.ghost-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 1200px) {
+  :root {
+    --sidebar-width: 204px;
+  }
+
+  .app-shell {
+    padding: 16px 20px 24px;
+  }
+}
+
+@media (max-width: 960px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 12px 14px 28px;
+  }
+}

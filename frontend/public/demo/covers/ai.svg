@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title">
+  <title id="title">人工智能</title>
+  <rect width="1200" height="720" fill="#173451"/>
+  <g fill="none" stroke="#5b9bd5" opacity=".46"><circle cx="950" cy="250" r="190" stroke-width="48"/><circle cx="950" cy="250" r="92" stroke-width="28"/><path d="M755 500h390M790 570h320" stroke-width="18"/></g>
+  <text x="86" y="118" fill="#9fc5e8" font-family="sans-serif" font-size="28" letter-spacing="8">ZHIMAI · AI</text>
+  <text x="82" y="350" fill="#fff" font-family="sans-serif" font-size="88" font-weight="700">人工智能</text>
+  <text x="86" y="416" fill="#c9dceb" font-family="sans-serif" font-size="32">从模型能力走向真实应用</text>
+</svg>

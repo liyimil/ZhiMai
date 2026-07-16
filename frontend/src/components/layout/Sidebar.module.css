@@ -1,0 +1,162 @@
+.sidebar {
+  position: sticky;
+  top: 20px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-height: calc(100vh - 40px);
+  padding: 24px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 36px rgba(20, 54, 48, 0.06);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px;
+}
+
+.logo {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 12px;
+  background: #123d38;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(18, 61, 56, 0.2);
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.brandText strong {
+  color: var(--color-text-strong);
+  font-size: 20px;
+  letter-spacing: 0.08em;
+}
+
+.brandText span {
+  margin-top: 5px;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.link {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 550;
+  border-radius: 10px;
+  transition: color 0.18s ease, background 0.18s ease;
+}
+
+.link svg {
+  width: 21px;
+  height: 21px;
+}
+
+.linkActive,
+.link:hover {
+  color: var(--color-primary-strong);
+  background: var(--color-surface-soft);
+}
+
+.divider {
+  width: 100%;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 0 10px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.footer span {
+  color: var(--color-primary-strong);
+  font-weight: 600;
+}
+
+@media (max-width: 960px) {
+  .sidebar {
+    position: sticky;
+    top: 8px;
+    z-index: 20;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: auto;
+    padding: 10px 12px;
+    border-radius: 16px;
+  }
+
+  .nav {
+    flex-direction: row;
+    justify-content: flex-end;
+    overflow-x: auto;
+  }
+
+  .link {
+    gap: 6px;
+    padding: 9px 10px;
+    white-space: nowrap;
+  }
+
+  .link svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .divider,
+  .footer {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .brandText,
+  .link {
+    font-size: 0;
+  }
+
+  .nav {
+    justify-content: space-between;
+  }
+
+  .link svg {
+    width: 22px;
+    height: 22px;
+  }
+}
