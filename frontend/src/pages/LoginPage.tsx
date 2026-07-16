@@ -9,12 +9,16 @@ type LocationState = {
   from?: string;
 };
 
+type LoginMode = "code" | "password";
+
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isLoading, user } = useAuth();
+  const [mode, setMode] = useState<LoginMode>("code");
   const [identifier, setIdentifier] = useState("");
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
@@ -40,7 +44,9 @@ const LoginPage = () => {
     setSubmitting(true);
 
     try {
-      const payload: LoginRequest = { identifierType: "PHONE", identifier, code };
+      const payload: LoginRequest = mode === "code"
+        ? { identifierType: "PHONE", identifier, code }
+        : { identifierType: "PHONE", identifier, password };
       await login(payload);
       navigate(from, { replace: true });
     } catch (err) {
@@ -73,7 +79,15 @@ const LoginPage = () => {
     }
   };
 
-  const isDisabled = submitting || !identifier || !code;
+  const handleModeChange = (nextMode: LoginMode) => {
+    setMode(nextMode);
+    setCode("");
+    setPassword("");
+    setError(null);
+  };
+
+  const credential = mode === "code" ? code : password;
+  const isDisabled = submitting || !identifier || !credential;
 
   return (
     <div className={styles.page}>
@@ -84,7 +98,26 @@ const LoginPage = () => {
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
-          {/* 只保留手机号 + 验证码登录，不提供选择 */}
+          <div className={styles.modeSwitch} role="tablist" aria-label="登录方式">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "code"}
+              className={`${styles.modeButton} ${mode === "code" ? styles.modeButtonActive : ""}`}
+              onClick={() => handleModeChange("code")}
+            >
+              验证码登录
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "password"}
+              className={`${styles.modeButton} ${mode === "password" ? styles.modeButtonActive : ""}`}
+              onClick={() => handleModeChange("password")}
+            >
+              密码登录
+            </button>
+          </div>
 
           <div className={styles.field}>
             <label className={styles.label} htmlFor="identifier">
@@ -100,30 +133,48 @@ const LoginPage = () => {
               autoComplete="tel"
             />
           </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="code">
-              验证码
-            </label>
-            <div className={styles.codeRow}>
-              <input
-                id="code"
-                className={styles.input}
-                value={code}
-                onChange={event => setCode(event.target.value)}
-                placeholder="请输入验证码"
-                autoComplete="one-time-code"
-              />
-              <button
-                type="button"
-                className={styles.codeButton}
-                disabled={sendingCode || countdown > 0}
-                onClick={handleSendCode}
-              >
-                {countdown > 0 ? `${countdown}s` : "获取验证码"}
-              </button>
+          {mode === "code" ? (
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="code">
+                验证码
+              </label>
+              <div className={styles.codeRow}>
+                <input
+                  id="code"
+                  className={styles.input}
+                  value={code}
+                  onChange={event => setCode(event.target.value)}
+                  placeholder="请输入验证码"
+                  autoComplete="one-time-code"
+                />
+                <button
+                  type="button"
+                  className={styles.codeButton}
+                  disabled={sendingCode || countdown > 0}
+                  onClick={handleSendCode}
+                >
+                  {countdown > 0 ? `${countdown}s` : "获取验证码"}
+                </button>
+              </div>
+              <span className={styles.tips}>验证码用于校验登录，不需要输入密码。</span>
             </div>
-            <span className={styles.tips}>验证码用于校验登录，不需要输入密码。</span>
-          </div>
+          ) : (
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="password">
+                密码
+              </label>
+              <input
+                id="password"
+                className={styles.input}
+                value={password}
+                onChange={event => setPassword(event.target.value)}
+                placeholder="请输入密码"
+                type="password"
+                autoComplete="current-password"
+              />
+              <span className={styles.tips}>使用注册时设置的密码登录。</span>
+            </div>
+          )}
 
           {error ? <div className={styles.error}>{error}</div> : null}
 

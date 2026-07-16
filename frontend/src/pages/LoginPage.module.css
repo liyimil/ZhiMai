@@ -56,6 +56,33 @@
   gap: 20px;
 }
 
+.modeSwitch {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #eef3f1;
+}
+
+.modeButton {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.modeButtonActive {
+  background: #ffffff;
+  color: var(--color-primary-strong);
+  box-shadow: 0 4px 12px rgba(20, 54, 48, 0.08);
+}
+
 .field {
   display: flex;
   flex-direction: column;
